@@ -11,10 +11,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 export async function signInWithGoogle() {
+  // Use the correct Replit domain for redirect
+  const redirectUrl = 'https://4b71de30-8a27-4379-b480-289c67f4f12e-00-2j3mbafqorhvs.riker.replit.dev';
+  
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${window.location.origin}`,
+      redirectTo: redirectUrl,
     }
   });
 
