@@ -14,6 +14,9 @@ export async function signInWithGoogle() {
   // Use the correct Replit domain for redirect
   const redirectUrl = 'https://4b71de30-8a27-4379-b480-289c67f4f12e-00-2j3mbafqorhvs.riker.replit.dev';
   
+  console.log('Starting Google sign-in with redirect URL:', redirectUrl);
+  console.log('Current window location:', window.location.href);
+  
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
@@ -26,6 +29,7 @@ export async function signInWithGoogle() {
     throw error;
   }
 
+  console.log('OAuth response data:', data);
   return data;
 }
 
