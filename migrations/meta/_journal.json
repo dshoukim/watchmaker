@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1748365806785,
+      "tag": "0000_lying_quasar",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1748390129638,
+      "tag": "0001_jittery_toad",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1748394192635,
+      "tag": "0002_talented_sharon_ventura",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1748394282213,
+      "tag": "0003_giant_kat_farrell",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1748403280526,
+      "tag": "0004_loving_robbie_robertson",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1748403301668,
+      "tag": "0005_damp_lionheart",
+      "breakpoints": true
+    }
+  ]
+}

@@ -79,3 +79,31 @@ export function getYear(item: TMDBMovie): string {
   const date = getReleaseDate(item);
   return date ? new Date(date).getFullYear().toString() : '';
 }
+
+export async function fetchMovieVideos(movieId: number): Promise<any[]> {
+  const res = await fetch(`/api/tmdb/movie/${movieId}/videos`);
+  if (!res.ok) throw new Error('Failed to fetch videos');
+  const data = await res.json();
+  return data.results || [];
+}
+
+export async function fetchMovieProviders(movieId: number): Promise<any> {
+  const res = await fetch(`/api/tmdb/movie/${movieId}/providers`);
+  if (!res.ok) throw new Error('Failed to fetch providers');
+  const data = await res.json();
+  return data.results || {};
+}
+
+export async function fetchMovieDetails(movieId: number): Promise<any> {
+  const res = await fetch(`/api/tmdb/movie/${movieId}`);
+  if (!res.ok) throw new Error('Failed to fetch movie details');
+  return res.json();
+}
+
+export async function fetchOMDBRatings(imdbId: string): Promise<any> {
+  const apiKey = import.meta.env.VITE_OMDB_API_KEY;
+  if (!apiKey) throw new Error('OMDB API key not set');
+  const res = await fetch(`https://www.omdbapi.com/?i=${imdbId}&apikey=${apiKey}`);
+  if (!res.ok) throw new Error('Failed to fetch OMDB ratings');
+  return res.json();
+}

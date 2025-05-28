@@ -1,0 +1,16 @@
+@keyframes swipeLeft {
+  to { transform: translateX(-400px) rotate(-24deg); opacity: 0; }
+}
+@keyframes swipeRight {
+  to { transform: translateX(400px) rotate(24deg); opacity: 0; }
+}
+@keyframes swipeUp {
+  to { transform: translateY(-400px) rotate(-8deg); opacity: 0; }
+}
+@keyframes swipeDown {
+  to { transform: translateY(400px) rotate(8deg); opacity: 0; }
+}
+.animate-swipe-left { animation: swipeLeft 0.4s forwards; }
+.animate-swipe-right { animation: swipeRight 0.4s forwards; }
+.animate-swipe-up { animation: swipeUp 0.4s forwards; }
+.animate-swipe-down { animation: swipeDown 0.4s forwards; } 

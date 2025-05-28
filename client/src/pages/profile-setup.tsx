@@ -8,10 +8,12 @@ import { getImageUrl, getTitle, getYear, fetchGenres, fetchDiscoverMovies, fetch
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { ThumbsUp, ThumbsDown, Loader2 } from 'lucide-react';
+import { useLocation } from 'wouter';
 
 export default function ProfileSetup() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [step, setStep] = useState(1);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [genres, setGenres] = useState<TMDBGenre[]>([]);
@@ -20,14 +22,25 @@ export default function ProfileSetup() {
   const [preferences, setPreferences] = useState({
     genres: [] as string[],
     favoriteMovies: [] as number[],
-    favoriteTVShows: [] as number[]
+    favoriteTVShows: [] as number[],
+    streamingServices: [] as number[],
   });
   const [isLoading, setIsLoading] = useState(false);
   const [contentType, setContentType] = useState<'movie' | 'tv'>('movie');
+  const [streamingServices, setStreamingServices] = useState<any[]>([]);
+  const [selectedServices, setSelectedServices] = useState<number[]>([]);
 
   useEffect(() => {
     loadGenres();
+    loadStreamingServices();
   }, []);
+
+  // Load recommendations when step becomes 3
+  useEffect(() => {
+    if (step === 3) {
+      loadRecommendations();
+    }
+  }, [step]);
 
   const loadGenres = async () => {
     try {
@@ -55,6 +68,21 @@ export default function ProfileSetup() {
     }
   };
 
+  const loadStreamingServices = async () => {
+    try {
+      const res = await fetch('/api/streaming-services');
+      if (!res.ok) throw new Error('Failed to fetch streaming services');
+      const data = await res.json();
+      setStreamingServices(data);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to load streaming services. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const loadRecommendations = async () => {
     if (selectedGenres.length === 0) {
       toast({
@@ -74,7 +102,7 @@ export default function ProfileSetup() {
       
       setRecommendations(items.slice(0, 10)); // Take first 10
       setCurrentIndex(0);
-      setStep(2);
+      setStep(3); // Move to step 3 after loading recommendations
     } catch (error) {
       console.error('Error loading recommendations:', error);
       toast({
@@ -92,6 +120,12 @@ export default function ProfileSetup() {
       prev.includes(genreId)
         ? prev.filter(id => id !== genreId)
         : [...prev, genreId]
+    );
+  };
+
+  const handleServiceToggle = (id: number) => {
+    setSelectedServices(prev =>
+      prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]
     );
   };
 
@@ -141,6 +175,31 @@ export default function ProfileSetup() {
     }
   };
 
+  const handleContinueFromGenres = () => {
+    if (selectedGenres.length === 0) {
+      toast({
+        title: 'Select Genres',
+        description: 'Please select at least one genre to continue.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setStep(2);
+  };
+
+  const handleContinueFromServices = () => {
+    if (selectedServices.length === 0) {
+      toast({
+        title: 'Select Streaming Services',
+        description: 'Please select at least one streaming service to continue.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setPreferences(prev => ({ ...prev, streamingServices: selectedServices }));
+    setStep(3); // Move to step 3
+  };
+
   const finishSetup = async () => {
     if (!user) return;
 
@@ -148,20 +207,27 @@ export default function ProfileSetup() {
     try {
       const finalPreferences = {
         ...preferences,
-        genres: selectedGenres
+        genres: selectedGenres,
+        streamingServices: selectedServices,
       };
 
-      await apiRequest('PUT', `/api/auth/user/${user.id}/preferences`, {
+      console.log('Submitting profile preferences:', finalPreferences);
+      const apiUrl = `/api/auth/user/${user.id}/preferences`;
+      console.log('API URL:', apiUrl);
+
+      const response = await apiRequest('PUT', apiUrl, {
         preferences: finalPreferences
       });
+
+      console.log('API Response:', response);
 
       toast({
         title: "Profile Complete!",
         description: "Your preferences have been saved. You can now create or join watch rooms.",
       });
 
-      // Redirect to dashboard
-      window.location.href = '/dashboard';
+      // Redirect to dashboard using navigate
+      navigate('/dashboard');
     } catch (error) {
       console.error('Error saving preferences:', error);
       toast({
@@ -175,10 +241,14 @@ export default function ProfileSetup() {
   };
 
   const currentMovie = recommendations[currentIndex];
-  const progress = step === 1 ? 33 : step === 2 ? 66 + (currentIndex / recommendations.length) * 33 : 100;
   const isMovieStep = contentType === 'movie';
   const totalSteps = recommendations.length * 2; // Movies + TV shows
   const currentStep = isMovieStep ? currentIndex + 1 : recommendations.length + currentIndex + 1;
+
+  const progress = step === 1 ? 0 :
+                   step === 2 ? 33 :
+                   step === 3 ? 66 + (recommendations.length > 0 ? ((currentIndex + 1) / recommendations.length) * 34 : 0) :
+                   100;
 
   if (step === 1) {
     return (
@@ -218,7 +288,7 @@ export default function ProfileSetup() {
           </Card>
 
           <Button
-            onClick={loadRecommendations}
+            onClick={handleContinueFromGenres}
             disabled={selectedGenres.length === 0 || isLoading}
             className="w-full bg-red-600 hover:bg-red-700 py-4 text-lg font-semibold"
           >
@@ -236,7 +306,66 @@ export default function ProfileSetup() {
     );
   }
 
-  if (step === 2 && currentMovie) {
+  if (step === 2) {
+    return (
+      <div className="min-h-screen px-6 py-8 bg-black">
+        <div className="max-w-lg mx-auto">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-white mb-2">Which streaming services do you subscribe to?</h2>
+            <p className="text-gray-400">Select all that apply</p>
+            <div className="mt-4">
+              <Progress value={progress} className="h-2 bg-gray-800" />
+              <span className="text-sm text-gray-400 mt-2 block">Step 2 of 3</span>
+            </div>
+          </div>
+
+          <Card className="bg-gray-900 border-gray-800 mb-6">
+            <CardHeader>
+              <CardTitle className="text-white">Streaming Services</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-3">
+                {streamingServices.map((service) => (
+                  <Button
+                    key={service.id}
+                    variant={selectedServices.includes(service.id) ? "default" : "outline"}
+                    className={`h-auto p-4 flex flex-col items-center text-center ${
+                      selectedServices.includes(service.id)
+                        ? 'bg-red-600 hover:bg-red-700 text-white border-red-600'
+                        : 'bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-700'
+                    }`}
+                    onClick={() => handleServiceToggle(service.id)}
+                  >
+                    {service.logoUrl && (
+                      <img src={service.logoUrl} alt={service.name} className="h-8 mb-2" />
+                    )}
+                    {service.name}
+                  </Button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Button
+            onClick={handleContinueFromServices}
+            disabled={selectedServices.length === 0 || isLoading}
+            className="w-full bg-red-600 hover:bg-red-700 py-4 text-lg font-semibold"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                Loading...
+              </>
+            ) : (
+              'Continue'
+            )}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 3 && currentMovie) {
     return (
       <div className="min-h-screen px-6 py-8 bg-black">
         <div className="max-w-md mx-auto">

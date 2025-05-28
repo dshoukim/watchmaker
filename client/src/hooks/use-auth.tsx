@@ -1,10 +1,10 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase, signInWithGoogle as supabaseSignIn, signOut as supabaseSignOut } from '@/lib/supabase';
 import { apiRequest } from '@/lib/queryClient';
-import type { User } from '@shared/schema';
+import type { Profile } from '@shared/schema';
 
 interface AuthContextType {
-  user: User | null;
+  user: Profile | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -13,7 +13,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
   const signInWithGoogle = async () => {
@@ -49,8 +49,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else if (response.status === 404) {
             // Create new user
             const newUserResponse = await apiRequest('POST', '/api/auth/signup', {
-              supabaseId: session.user.id,
-              email: session.user.email || '',
+              supabase_id: session.user.id,
+              email: session.user.email || 'unknown@example.com',
               name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
               avatar: session.user.user_metadata?.avatar_url,
               preferences: null
@@ -79,8 +79,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else if (response.status === 404) {
             // Create new user
             const newUserResponse = await apiRequest('POST', '/api/auth/signup', {
-              supabaseId: session.user.id,
-              email: session.user.email || '',
+              supabase_id: session.user.id,
+              email: session.user.email || 'unknown@example.com',
               name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
               avatar: session.user.user_metadata?.avatar_url,
               preferences: null

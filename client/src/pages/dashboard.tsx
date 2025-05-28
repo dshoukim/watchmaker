@@ -6,9 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, QrCode, LogOut, Film, Tv, Users, Trophy } from 'lucide-react';
+import { Plus, QrCode, LogOut, Film, Tv, Users, Trophy, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { QRCode } from '@/components/qr-code';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
@@ -30,7 +31,7 @@ export default function Dashboard() {
     if (!user) return;
     
     try {
-      const response = await fetch(`/api/users/${user.id}/sessions`);
+      const response = await fetch(`/api/profiles/${user.id}/sessions`);
       if (response.ok) {
         const sessions = await response.json();
         setRecentSessions(sessions.slice(0, 5)); // Show last 5 sessions
@@ -119,7 +120,7 @@ export default function Dashboard() {
 
   const userInitials = user.name
     .split(' ')
-    .map(n => n[0])
+    .map((n: string) => n[0])
     .join('')
     .toUpperCase()
     .slice(0, 2);
@@ -133,17 +134,25 @@ export default function Dashboard() {
           WatchTogether
         </h1>
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
-            <span className="text-black font-semibold text-sm">{userInitials}</span>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLogout}
-            className="text-gray-400 hover:text-white"
-          >
-            <LogOut className="w-4 h-4" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center cursor-pointer">
+                <span className="text-black font-semibold text-sm">{userInitials}</span>
+              </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56 bg-gray-800 border-gray-700 text-white">
+              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-gray-700" />
+              <DropdownMenuItem onClick={() => window.location.href = '/profile-settings'} className="focus:bg-gray-700 cursor-pointer">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Profile Settings</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout} className="focus:bg-gray-700 cursor-pointer">
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Log out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 

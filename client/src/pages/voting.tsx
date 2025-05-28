@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
 import { useRoom } from '@/hooks/use-room';
@@ -8,6 +8,7 @@ import { ArrowLeft, SkipForward, Eye, ThumbsDown, Heart, Star } from 'lucide-rea
 import { SwipeCard } from '@/components/swipe-card';
 import { useToast } from '@/hooks/use-toast';
 import type { TMDBMovie } from '@/lib/tmdb';
+import { MovieDetailModal } from '@/components/movie-detail-modal';
 
 export default function Voting() {
   const { code } = useParams();
@@ -19,6 +20,11 @@ export default function Voting() {
   const [userVotes, setUserVotes] = useState<Map<number, number>>(new Map());
   const [isVoting, setIsVoting] = useState(false);
   const [waitingForPartner, setWaitingForPartner] = useState(false);
+  const [selectedMovie, setSelectedMovie] = useState<TMDBMovie | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [swipeDirection, setSwipeDirection] = useState<null | 'left' | 'right' | 'up' | 'down'>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const animationTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!room || !user) {
@@ -48,45 +54,51 @@ export default function Voting() {
     }
   }, [userVotes, recommendations]);
 
-  const handleVote = async (direction: 'left' | 'right' | 'up' | 'down', score: number) => {
-    if (!room || !user || isVoting || currentIndex >= recommendations.length) return;
+  useEffect(() => {
+    return () => {
+      if (animationTimeout.current) clearTimeout(animationTimeout.current);
+    };
+  }, []);
 
+  const handleVote = async (direction: 'left' | 'right' | 'up' | 'down', score: number) => {
+    if (!room || !user || isVoting || isAnimating || currentIndex >= recommendations.length) return;
     const currentMovie = recommendations[currentIndex];
     if (!currentMovie || userVotes.has(currentMovie.id)) return;
-
-    setIsVoting(true);
-    try {
-      await castVote(currentMovie.id, score);
-      setUserVotes(prev => new Map(prev).set(currentMovie.id, score));
-      
-      // Move to next recommendation
-      if (currentIndex < recommendations.length - 1) {
-        setCurrentIndex(prev => prev + 1);
+    setIsAnimating(true);
+    setSwipeDirection(direction);
+    // Wait for animation, then update state
+    animationTimeout.current = setTimeout(async () => {
+      setIsAnimating(false);
+      setSwipeDirection(null);
+      setIsVoting(true);
+      try {
+        await castVote(currentMovie.id, score);
+        setUserVotes(prev => new Map(prev).set(currentMovie.id, score));
+        if (currentIndex < recommendations.length - 1) {
+          setCurrentIndex(prev => prev + 1);
+        }
+        // Show feedback
+        const messages = {
+          'up': '❤️ Love it!',
+          'right': '👍 Like it!',
+          'left': '👎 Not for me',
+          'down': '👁️ Already seen'
+        };
+        toast({
+          title: messages[direction],
+          description: `Voted on "${currentMovie.title || currentMovie.name}"`,
+        });
+      } catch (error) {
+        console.error('Error casting vote:', error);
+        toast({
+          title: "Error",
+          description: "Failed to cast vote. Please try again.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsVoting(false);
       }
-
-      // Show feedback
-      const messages = {
-        'up': '❤️ Love it!',
-        'right': '👍 Like it!',
-        'left': '👎 Not for me',
-        'down': '👁️ Already seen'
-      };
-      
-      toast({
-        title: messages[direction],
-        description: `Voted on "${currentMovie.title || currentMovie.name}"`,
-      });
-
-    } catch (error) {
-      console.error('Error casting vote:', error);
-      toast({
-        title: "Error",
-        description: "Failed to cast vote. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsVoting(false);
-    }
+    }, 400); // Animation duration
   };
 
   const handleSkip = () => {
@@ -189,33 +201,48 @@ export default function Voting() {
       </header>
 
       {/* Swipe Card Area */}
-      <main className="flex-1 relative px-6 pt-6 pb-32">
-        <div className="absolute inset-x-6 top-6 bottom-32">
-          {/* Current Card */}
-          {currentMovie && (
-            <div className="absolute inset-0" style={{ zIndex: 2 }}>
-              <SwipeCard
-                movie={currentMovie as TMDBMovie}
-                onSwipe={handleVote}
-                isActive={!isVoting}
-              />
-            </div>
-          )}
-          
-          {/* Next Card (behind) */}
-          {nextMovie && (
-            <div 
-              className="absolute inset-0 transform scale-95 opacity-50" 
-              style={{ zIndex: 1 }}
-            >
-              <SwipeCard
-                movie={nextMovie as TMDBMovie}
-                onSwipe={() => {}}
-                isActive={false}
-              />
-            </div>
-          )}
+      <main className="flex-1 flex flex-col items-center justify-start px-6 pt-4 pb-32 mt-8">
+        <div className="relative w-full max-w-xs md:max-w-sm h-[420px] md:h-[540px] mb-4">
+          {Array.from({ length: 3 }).map((_, i) => {
+            const cardIndex = currentIndex + i;
+            const movie = recommendations[cardIndex];
+            if (!movie) return null;
+            // Stack: top card (i=0), next (i=1), back (i=2)
+            const z = 3 - i;
+            const scale = 1 - i * 0.06;
+            const translateY = i * 18;
+            const opacity = i === 2 ? 0.7 : 1;
+            const isExiting = i === 0 && isAnimating && swipeDirection;
+            return (
+              <div
+                key={movie.id}
+                className="absolute left-0 right-0 mx-auto transition-all duration-300"
+                style={{
+                  zIndex: z,
+                  transform: `scale(${scale}) translateY(${translateY}px)`,
+                  opacity,
+                  pointerEvents: i === 0 ? 'auto' : 'none',
+                }}
+              >
+                <SwipeCard
+                  movie={movie}
+                  onSwipe={i === 0 ? handleVote : () => {}}
+                  isActive={i === 0 && !isVoting && !isAnimating}
+                  onCardClick={i === 0 ? () => {
+                    setSelectedMovie(movie);
+                    setIsModalOpen(true);
+                  } : undefined}
+                  exitAnimation={isExiting ? swipeDirection : undefined}
+                />
+              </div>
+            );
+          })}
         </div>
+        <MovieDetailModal
+          movie={selectedMovie}
+          open={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+        />
       </main>
 
       {/* Voting Controls */}
