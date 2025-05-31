@@ -21,7 +21,7 @@ npm install
 
 ### 2. Environment Variables
 
-Create a `.env` file in the root directory with:
+**Important:** Do not use the example keys below in production. Set your own values in a `.env` file.
 
 ```env
 # Supabase Configuration
@@ -32,7 +32,7 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 DATABASE_URL=your_supabase_database_url_here
 
 # TMDB API
-TMDB_API_KEY=d208a6c1c2cfdca15eb0865db44f32f2
+TMDB_API_KEY=your-tmdb-api-key
 TMDB_ACCESS_TOKEN=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJkMjA4YTZjMWMyY2ZkY2ExNWViMDg2NWRiNDRmMzJmMiIsIm5iZiI6MTc0Nzk2MzQyNi4zNzc5OTk4LCJzdWIiOiI2ODJmY2UyMmMyMGFmOTg2ZTZiNmE1ZjciLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.RJrvP8EimCjRbnsK97-hNEqwx28jbB9qZVWe37cP3sM
 ```
 
