@@ -1,24 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { profiles, watchPartyContent, watchPartySwipes, contentRatings, usersInAuth, users, rooms, roomParticipants, votes, userSessions } from "./schema";
-
-export const watchPartyContentRelations = relations(watchPartyContent, ({one, many}) => ({
-	profile: one(profiles, {
-		fields: [watchPartyContent.addedBy],
-		references: [profiles.id]
-	}),
-	watchPartySwipes: many(watchPartySwipes),
-	contentRatings: many(contentRatings),
-}));
-
-export const profilesRelations = relations(profiles, ({one, many}) => ({
-	watchPartyContents: many(watchPartyContent),
-	watchPartySwipes: many(watchPartySwipes),
-	contentRatings: many(contentRatings),
-	usersInAuth: one(usersInAuth, {
-		fields: [profiles.id],
-		references: [usersInAuth.id]
-	}),
-}));
+import { watchPartyContent, watchPartySwipes, profiles, contentRatings, usersInAuth, users, rooms, roomParticipants, votes, userSessions, content, wishlist, ratedContent } from "./schema";
 
 export const watchPartySwipesRelations = relations(watchPartySwipes, ({one}) => ({
 	watchPartyContent: one(watchPartyContent, {
@@ -29,6 +10,27 @@ export const watchPartySwipesRelations = relations(watchPartySwipes, ({one}) => 
 		fields: [watchPartySwipes.userId],
 		references: [profiles.id]
 	}),
+}));
+
+export const watchPartyContentRelations = relations(watchPartyContent, ({one, many}) => ({
+	watchPartySwipes: many(watchPartySwipes),
+	contentRatings: many(contentRatings),
+	profile: one(profiles, {
+		fields: [watchPartyContent.addedBy],
+		references: [profiles.id]
+	}),
+}));
+
+export const profilesRelations = relations(profiles, ({one, many}) => ({
+	watchPartySwipes: many(watchPartySwipes),
+	contentRatings: many(contentRatings),
+	usersInAuth: one(usersInAuth, {
+		fields: [profiles.id],
+		references: [usersInAuth.id]
+	}),
+	watchPartyContents: many(watchPartyContent),
+	wishlists: many(wishlist),
+	ratedContents: many(ratedContent),
 }));
 
 export const contentRatingsRelations = relations(contentRatings, ({one}) => ({
@@ -93,5 +95,32 @@ export const userSessionsRelations = relations(userSessions, ({one}) => ({
 	user: one(users, {
 		fields: [userSessions.userId],
 		references: [users.id]
+	}),
+}));
+
+export const wishlistRelations = relations(wishlist, ({one}) => ({
+	content: one(content, {
+		fields: [wishlist.contentId],
+		references: [content.id]
+	}),
+	profile: one(profiles, {
+		fields: [wishlist.userId],
+		references: [profiles.id]
+	}),
+}));
+
+export const contentRelations = relations(content, ({many}) => ({
+	wishlists: many(wishlist),
+	ratedContents: many(ratedContent),
+}));
+
+export const ratedContentRelations = relations(ratedContent, ({one}) => ({
+	content: one(content, {
+		fields: [ratedContent.contentId],
+		references: [content.id]
+	}),
+	profile: one(profiles, {
+		fields: [ratedContent.userId],
+		references: [profiles.id]
 	}),
 }));

@@ -1,10 +1,8 @@
-import { rooms, roomParticipants, votes, userSessions, type Room, type InsertRoom, type RoomParticipant, type InsertRoomParticipant, type Vote, type InsertVote, type UserSession, type InsertUserSession, type StreamingService, type InsertStreamingService, content, ratedContent, profiles } from "@shared/schema";
+import { rooms, roomParticipants, votes, userSessions, type Room, type InsertRoom, type RoomParticipant, type InsertRoomParticipant, type Vote, type InsertVote, type UserSession, type InsertUserSession, type StreamingService, type InsertStreamingService } from "@shared/schema";
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-console.log('SUPABASE_URL:', process.env.SUPABASE_URL);
-console.log('SUPABASE_KEY:', process.env.SUPABASE_KEY);
 
-const supabaseUrl = 'https://qouppyvbepiccepacxne.supabase.co' //process.env.SUPABASE_URL!;
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFvdXBweXZiZXBpY2NlcGFjeG5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc5NDI1NDIsImV4cCI6MjA2MzUxODU0Mn0.uYvLjL7X4cP8Q3j0W7LWvEwsJTt6-8-34Xb0vkq-79E' //process.env.SUPABASE_KEY!;
+const supabaseUrl = process.env.SUPABASE_URL!;
+const supabaseKey = process.env.SUPABASE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export interface IStorage {
@@ -13,7 +11,6 @@ export interface IStorage {
   getUserBySupabaseId(supabase_id: string): Promise<any | undefined>;
   createUser(user: any): Promise<any>;
   updateUserPreferences(id: number, preferences: any): Promise<any | undefined>;
-  getUserRatedContent(supabaseUserId: string): Promise<any[]>;
 
   // Rooms
   createRoom(room: InsertRoom): Promise<Room>;
@@ -21,7 +18,6 @@ export interface IStorage {
   updateRoomStatus(id: number, status: "waiting" | "voting" | "completed"): Promise<Room | undefined>;
   updateRoomRecommendations(id: number, recommendations: any[]): Promise<Room | undefined>;
   updateRoomResults(id: number, results: any[]): Promise<Room | undefined>;
-  testRoomsTableAccess(): Promise<{ data: any; error: any; count: number | null }>;
 
   // Room Participants
   addParticipant(participant: InsertRoomParticipant): Promise<RoomParticipant>;
@@ -58,38 +54,8 @@ export class SupabaseStorage implements IStorage {
   }
   async updateUserPreferences(id: number, preferences: any) {
     console.log('Supabase: updateUserPreferences', { id, preferences });
-
-    // 1. Fetch existing user data (which includes preferences)
-    const { data: existingUserData, error: fetchError } = await supabase
-      .from('users')
-      .select('preferences')
-      .eq('id', id)
-      .single();
-
-    if (fetchError) {
-      console.error('Error fetching existing user preferences:', fetchError);
-      throw fetchError;
-    }
-
-    // 2. Merge existing preferences with new preferences
-    // Ensure existingUserData and existingUserData.preferences are not null
-    const existingPreferences = existingUserData?.preferences || {};
-    const mergedPreferences = { ...existingPreferences, ...preferences };
-
-    console.log('Supabase: Merged preferences for update', mergedPreferences);
-
-    // 3. Update with merged preferences
-    const { data, error } = await supabase
-      .from('users')
-      .update({ preferences: mergedPreferences })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error updating user preferences with merged data:', error);
-      throw error;
-    }
+    const { data, error } = await supabase.from('users').update({ preferences }).eq('id', id).select().single();
+    if (error) throw error;
     return data;
   }
   async createVote(vote: InsertVote): Promise<Vote | undefined> {
@@ -112,80 +78,24 @@ export class SupabaseStorage implements IStorage {
   }
   async createRoom(room: InsertRoom): Promise<Room> {
     console.log('Supabase: createRoom', room);
-    
-    // Map camelCase field names to snake_case database column names
-    const roomForDatabase = {
-      code: room.code,
-      host_id: room.hostId, // Map hostId to host_id
-      content_type: room.contentType,
-      status: room.status,
-      recommendations: room.recommendations,
-      results: room.results
-    };
-    
-    console.log('Supabase: createRoom - mapped data for database:', roomForDatabase);
-    
-    const { data, error } = await supabase.from('rooms').insert([roomForDatabase]).select().single();
+    const { data, error } = await supabase.from('rooms').insert([room]).select().single();
     if (error) {
       console.error('Error creating room:', error);
       throw error;
     }
-    
-    // Map the response back to camelCase for our application
-    const mappedData = {
-      ...data,
-      hostId: data.host_id, // Map host_id back to hostId
-      contentType: data.content_type,
-      createdAt: data.created_at
-    };
-    
-    return mappedData as Room;
+    return data as Room;
   }
   async getRoomByCode(code: string): Promise<Room | undefined> {
     console.log('Supabase: getRoomByCode', code);
-    try {
-      const { data, error } = await supabase.from('rooms').select('*').eq('code', code).single();
-      
-      if (error) {
-        console.log('Supabase getRoomByCode error details:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        
-        if (error.code === 'PGRST116') {
-          // No rows found - this is expected when checking for unique room codes
-          console.log('Room code', code, 'is available (no existing room found)');
-          return undefined;
-        }
-        
-        // For any other error, log details and throw
-        console.error('Error fetching room by code:', error);
-        throw error;
+    const { data, error } = await supabase.from('rooms').select('*').eq('code', code).single();
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return undefined;
       }
-      
-      console.log('Found existing room with code:', code, data);
-      
-      // Map the response back to camelCase for our application
-      const mappedData = {
-        ...data,
-        hostId: data.host_id, // Map host_id back to hostId
-        contentType: data.content_type,
-        createdAt: data.created_at
-      };
-      
-      return mappedData as Room;
-    } catch (err) {
-      console.error('Caught exception in getRoomByCode:', err);
-      console.error('Error type:', typeof err);
-      console.error('Error constructor:', err?.constructor?.name);
-      if (err instanceof Error) {
-        console.error('Error message:', err.message);
-        console.error('Error stack:', err.stack);
-      }
-      throw err;
+      console.error('Error fetching room by code:', error);
+      throw error;
     }
+    return data as Room;
   }
   async updateRoomStatus(id: number, status: "waiting" | "voting" | "completed"): Promise<Room | undefined> {
     console.log('Supabase: updateRoomStatus', { id, status });
@@ -235,34 +145,18 @@ export class SupabaseStorage implements IStorage {
   }
   async addParticipant(participant: InsertRoomParticipant): Promise<RoomParticipant> {
     console.log('Supabase: addParticipant', participant);
-    
-    // Map camelCase field names to snake_case database column names
-    const participantForDatabase = {
-      room_id: participant.roomId, // Map roomId to room_id
-      user_id: participant.userId  // Map userId to user_id
-    };
-    
-    console.log('Supabase: addParticipant - mapped data for database:', participantForDatabase);
-    
+    // Ensure participant.userId is the integer ID from public.users
+    // and participant.roomId is the integer ID from rooms
     const { data, error } = await supabase
       .from('room_participants')
-      .insert([participantForDatabase])
+      .insert([participant])
       .select()
       .single();
     if (error) {
       console.error('Error adding participant:', error);
       throw error;
     }
-    
-    // Map the response back to camelCase for our application
-    const mappedData = {
-      ...data,
-      roomId: data.room_id, // Map room_id back to roomId
-      userId: data.user_id, // Map user_id back to userId
-      joinedAt: data.joined_at
-    };
-    
-    return mappedData as RoomParticipant;
+    return data as RoomParticipant;
   }
   async getRoomParticipants(roomId: number): Promise<RoomParticipant[]> {
     console.log('Supabase: getRoomParticipants', roomId);
@@ -345,74 +239,6 @@ export class SupabaseStorage implements IStorage {
       throw error;
     }
     return data as StreamingService[];
-  }
-  async getUserRatedContent(supabaseUserId: string): Promise<any[]> {
-    console.log('Supabase: getUserRatedContent for supabaseUserId:', supabaseUserId);
-
-    interface RatedContentItemFromSupabase {
-      rating: number;
-      rated_at: string;
-      content: Array<{
-        id: number;
-        tmdbId: number;
-        type: 'movie' | 'tv';
-        title: string;
-        overview: string | null;
-        posterPath: string | null;
-        releaseDate: string | null;
-      }> | null;
-    }
-
-    const { data, error } = await supabase
-      .from('rated_content')
-      .select(`
-        rating,
-        rated_at,
-        content:content_id (
-          id,
-          tmdbId,
-          type,
-          title,
-          overview,
-          posterPath,
-          releaseDate
-        )
-      `)
-      .eq('user_id', supabaseUserId);
-
-    if (error) {
-      console.error('Error fetching user rated content:', error);
-      throw error;
-    }
-    // Transform data to match client expectation (RatedContent type)
-    // Ensure item.content is not null before accessing its properties
-    return (data as RatedContentItemFromSupabase[]).map(item => ({
-      id: item.content && item.content.length > 0 ? item.content[0].id : null,
-      title: item.content && item.content.length > 0 ? item.content[0].title : 'Unknown',
-      type: item.content && item.content.length > 0 ? item.content[0].type : 'movie',
-      posterPath: item.content && item.content.length > 0 ? item.content[0].posterPath : null,
-      rating: item.rating,
-      ratedAt: item.rated_at
-    }));
-  }
-  async testRoomsTableAccess(): Promise<{ data: any; error: any; count: number | null }> {
-    console.log('Supabase: testRoomsTableAccess - checking if rooms table exists and is accessible');
-    try {
-      // Try a simple count query first
-      const { data, error, count } = await supabase
-        .from('rooms')
-        .select('*', { count: 'exact', head: true }); // head: true means don't return data, just count
-      
-      console.log('Rooms table count query result:', { data, error, count });
-      return { data, error, count };
-    } catch (err) {
-      console.error('Exception during rooms table test:', err);
-      return { 
-        data: null, 
-        error: err instanceof Error ? { message: err.message, stack: err.stack } : err, 
-        count: null 
-      };
-    }
   }
 }
 

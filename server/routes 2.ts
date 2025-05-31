@@ -29,19 +29,10 @@ async function generateRoomCode(): Promise<string> {
     for (let i = 0; i < 8; i++) {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    
-    try {
-      const existingRoom = await storage.getRoomByCode(result);
-      if (!existingRoom) {
-        return result; // Unique code found
-      }
-    } catch (error) {
-      console.error('Failed to check existing room codes, using generated code anyway:', error);
-      // If we can't check for existing rooms, just return the generated code
-      // This is a fallback to keep the app working even if there are DB issues
-      return result;
+    const existingRoom = await storage.getRoomByCode(result);
+    if (!existingRoom) {
+      return result; // Unique code found
     }
-    
     attempts++;
   }
   throw new Error('Failed to generate a unique room code after multiple attempts.');
@@ -77,7 +68,7 @@ const getSupabaseClient = (req: Request) => {
   
   // Fallback to anon client if no token (adjust based on your RLS and needs)
   // You might want to throw an error here if the endpoint strictly requires authentication
-  const supabaseKey = process.env.SUPABASE_ACCESS_TOKEN;
+  const supabaseKey = process.env.SUPABASE_KEY!; // Use SUPABASE_KEY and non-null assertion
   return createClient(supabaseUrl, supabaseKey);
 };
 
@@ -143,18 +134,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Map camelCase to snake_case for supabase_id
       const { supabase_id, ...rest } = req.body;
-      
-      if (!supabase_id) {
-        return res.status(400).json({ error: 'supabase_id is required' });
-      }
-      
       const userData = insertPublicUserSchema.parse({
-        supabaseId: supabase_id,
+        supabase_id: supabase_id,
         ...rest
       });
       
       // Check if user already exists
-      const existingUser = await storage.getUserBySupabaseId(userData.supabaseId as string);
+      const existingUser = await storage.getUserBySupabaseId(userData.supabaseId);
       if (existingUser) {
         return res.json(existingUser);
       }
@@ -198,18 +184,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(user);
     } catch (error) {
       res.status(500).json({ error: 'Server error' });
-    }
-  });
-
-  app.get('/api/auth/user/:supabase_id/rated-content', async (req, res) => {
-    try {
-      const { supabase_id } = req.params;
-      console.log(`GET /api/auth/user/${supabase_id}/rated-content endpoint hit`);
-      const ratedItems = await storage.getUserRatedContent(supabase_id);
-      res.json({ ratedItems }); // Return in a consistent object structure like { ratedItems: [...] }
-    } catch (error) {
-      console.error('Failed to fetch user rated content:', error);
-      res.status(500).json({ error: 'Server error fetching rated content' });
     }
   });
 
@@ -280,45 +254,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Room Routes
   app.post('/api/rooms', async (req, res) => {
     try {
-      console.log('[POST /api/rooms] Request body:', JSON.stringify(req.body, null, 2));
-      
       const { hostId } = req.body; // Ensure hostId is the integer ID from public.users
       
-      console.log('[POST /api/rooms] Extracted hostId:', hostId, 'Type:', typeof hostId);
-      
       if (!hostId) {
-        console.log('[POST /api/rooms] Missing hostId in request');
         return res.status(400).json({ error: 'Host ID required' });
       }
       
       const code = await generateRoomCode(); // Now awaits the unique code
-      console.log('[POST /api/rooms] Generated room code:', code);
 
-      const roomData = {
+      const roomData = insertRoomSchema.parse({
         code,
         hostId, // This should be the integer ID from public.users
         status: 'waiting'
-      };
+      });
       
-      console.log('[POST /api/rooms] Room data before schema parse:', JSON.stringify(roomData, null, 2));
-      
-      const parsedRoomData = insertRoomSchema.parse(roomData);
-      console.log('[POST /api/rooms] Room data after schema parse:', JSON.stringify(parsedRoomData, null, 2));
-      
-      console.log('[POST /api/rooms] Calling storage.createRoom...');
-      const room = await storage.createRoom(parsedRoomData);
-      console.log('[POST /api/rooms] Room created successfully:', JSON.stringify(room, null, 2));
-      
+      const room = await storage.createRoom(roomData);
       res.status(201).json(room); // 201 Created
     } catch (error) {
-      console.error('[POST /api/rooms] Error creating room:', error);
-      
-      // Log more details about the error
-      if (error instanceof Error) {
-        console.error('[POST /api/rooms] Error message:', error.message);
-        console.error('[POST /api/rooms] Error stack:', error.stack);
-      }
-      
+      console.error('Failed to create room:', error);
       // More specific error handling based on error type if needed
       if (error instanceof Error && error.message.includes('unique room code')) {
         return res.status(500).json({ error: 'Internal server error: Could not generate unique room code.' });
@@ -534,31 +487,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Failed to fetch streaming services:', error);
       console.error('Streaming services error details:', error);
       res.status(500).json({ error: 'Failed to fetch streaming services' });
-    }
-  });
-
-  // Test endpoint to check if rooms table exists
-  app.get('/api/test/rooms-table', async (req, res) => {
-    try {
-      console.log('Testing rooms table existence...');
-      const { data, error, count } = await storage.testRoomsTableAccess();
-      console.log('Rooms table test result:', { data, error, count });
-      res.json({ 
-        success: !error, 
-        data, 
-        error: error ? { 
-          code: error.code, 
-          message: error.message, 
-          details: error.details 
-        } : null,
-        count 
-      });
-    } catch (err) {
-      console.error('Rooms table test failed:', err);
-      res.status(500).json({ 
-        success: false, 
-        error: err instanceof Error ? err.message : 'Unknown error' 
-      });
     }
   });
 

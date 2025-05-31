@@ -29,7 +29,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
         </div>
       ) : !user ? (
         <Login />
-      ) : !user.preferences || !user.preferences.genres || user.preferences.genres.length === 0 ? (
+      ) : !user.preferences || !(user.preferences as any)?.genres || (user.preferences as any).genres.length === 0 ? (
         <ProfileSetup />
       ) : (
         children

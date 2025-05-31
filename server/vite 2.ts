@@ -20,15 +20,11 @@ export function log(message: string, source = "express") {
 }
 
 export async function setupVite(app: Express, server: Server) {
-  console.log('[VITE SETUP] Starting Vite development server setup...');
-  
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },
-    allowedHosts: true as const,
+    allowedHosts: true,
   };
-
-  console.log('[VITE SETUP] Creating Vite server with options:', serverOptions);
 
   const vite = await createViteServer({
     ...viteConfig,
@@ -36,7 +32,6 @@ export async function setupVite(app: Express, server: Server) {
     customLogger: {
       ...viteLogger,
       error: (msg, options) => {
-        console.error('[VITE ERROR]', msg);
         viteLogger.error(msg, options);
         process.exit(1);
       },
@@ -45,28 +40,9 @@ export async function setupVite(app: Express, server: Server) {
     appType: "custom",
   });
 
-  console.log('[VITE SETUP] Vite server created successfully');
-
   app.use(vite.middlewares);
-  console.log('[VITE SETUP] Vite middleware added to Express');
-
-  // Only serve HTML for requests that don't look like assets
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
-    
-    // Let Vite handle asset requests (JS, CSS, images, etc.)
-    if (url.includes('.') && !url.endsWith('.html')) {
-      console.log('[VITE HANDLER] Skipping asset request:', url);
-      return next();
-    }
-    
-    // Also skip API requests
-    if (url.startsWith('/api/')) {
-      console.log('[VITE HANDLER] Skipping API request:', url);
-      return next();
-    }
-    
-    console.log('[VITE HANDLER] Handling HTML request for:', url);
 
     try {
       const clientTemplate = path.resolve(
@@ -76,31 +52,19 @@ export async function setupVite(app: Express, server: Server) {
         "index.html",
       );
 
-      console.log('[VITE HANDLER] Reading template from:', clientTemplate);
-
       // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      console.log('[VITE HANDLER] Original template (first 200 chars):', template.substring(0, 200));
-      
       template = template.replace(
         `src="/src/main.tsx"`,
         `src="/src/main.tsx?v=${nanoid()}"`,
       );
-      
-      console.log('[VITE HANDLER] Transforming HTML for URL:', url);
       const page = await vite.transformIndexHtml(url, template);
-      console.log('[VITE HANDLER] Final HTML being sent (first 500 chars):', page.substring(0, 500));
-      console.log('[VITE HANDLER] Sending transformed HTML response');
-      
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
-      console.error('[VITE HANDLER] Error processing request:', e);
       vite.ssrFixStacktrace(e as Error);
       next(e);
     }
   });
-  
-  console.log('[VITE SETUP] Vite setup completed successfully');
 }
 
 export function serveStatic(app: Express) {

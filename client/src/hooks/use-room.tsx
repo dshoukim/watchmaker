@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { useWebSocket } from '@/lib/websocket';
 import { useAuth } from './use-auth';
 import type { Room } from '@shared/schema';
+import { useLocation } from 'wouter';
 
 interface RoomContextType {
   room: Room | null;
@@ -27,6 +28,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const [votes, setVotes] = useState<any[]>([]);
   const [results, setResults] = useState<any[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [, navigate] = useLocation();
 
   const { sendMessage, subscribe } = useWebSocket(room?.code || null, user?.id || null);
 
@@ -121,6 +123,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       const roomData = await response.json();
       setRoom(roomData);
       setParticipants([{ userId: user.id }]);
+      // Navigate to the new room page
+      navigate(`/room/${roomData.code}`);
       return roomData.code;
     } catch (error) {
       console.error('Error creating room:', error);

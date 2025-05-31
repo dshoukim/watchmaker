@@ -18,18 +18,24 @@ type UserProfilePreferencesResponse = { preferences?: { streamingServices: numbe
 type UserRatedContentResponse = { ratedItems?: RatedContent[] };
 
 export default function ProfileSettings() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [, navigate] = useLocation(); // Get navigate function from wouter's useLocation
-  const [activeSection, setActiveSection] = useState('streaming'); // 'streaming' or 'history'
+  const [, navigate] = useLocation();
+  const [activeSection, setActiveSection] = useState('streaming');
   const [allStreamingServices, setAllStreamingServices] = useState<StreamingService[]>([]);
   const [selectedServices, setSelectedServices] = useState<number[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [ratedContent, setRatedContent] = useState<RatedContent[]>([]); // State for watch history
+  const [isStreamingLoading, setIsStreamingLoading] = useState(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [ratedContent, setRatedContent] = useState<RatedContent[]>([]);
 
-  // Effect to load data based on the active section or user changes
   useEffect(() => {
-    if (!user) return;
+    console.log('[ProfileSettings] User from useAuth:', user);
+    console.log('[ProfileSettings] Auth loading state:', authLoading);
+    if (authLoading || !user) {
+      console.log('[ProfileSettings] User not available or auth still loading, returning from main useEffect.');
+      return;
+    }
 
     if (activeSection === 'streaming') {
       loadStreamingServices();
@@ -37,20 +43,25 @@ export default function ProfileSettings() {
     } else if (activeSection === 'history') {
       loadWatchHistory();
     }
-  }, [user, activeSection]);
+  }, [user, authLoading, activeSection]);
 
   const loadStreamingServices = async () => {
+    console.log('[ProfileSettings] loadStreamingServices called');
+    setIsStreamingLoading(true);
     try {
       const res = await fetch('/api/streaming-services');
       if (!res.ok) throw new Error('Failed to fetch streaming services');
       const data = await res.json();
+      console.log('[ProfileSettings] Streaming services data:', data);
       setAllStreamingServices(data);
     } catch (error) {
+      console.error('[ProfileSettings] Error loading streaming services:', error);
       toast({
         title: 'Error',
         description: 'Failed to load streaming services. Please try again.',
         variant: 'destructive',
       });
+      setSelectedServices([]);
     }
   };
 
@@ -79,27 +90,28 @@ export default function ProfileSettings() {
   };
 
   const loadWatchHistory = async () => {
-      if (!user || !user.id) return;
-      setIsLoading(true); // Indicate loading for history
+      if (!user || !user.id || !user.supabaseId) {
+        console.log('[ProfileSettings] loadWatchHistory: User, user.id, or user.supabaseId not available.');
+        setIsHistoryLoading(false);
+        return;
+      }
+      console.log('[ProfileSettings] loadWatchHistory called for user (supabaseId):', user.supabaseId);
+      setIsHistoryLoading(true);
       try {
-          // *** TODO: Replace with actual API call to fetch user's rated content ***
-          // This is a placeholder API call and dummy data structure assumption
-          const response = await apiRequest('GET', `/api/auth/user/${user.id}/rated-content`);
-          // Explicitly type the response and access the nested property
+          const response = await apiRequest('GET', `/api/auth/user/${user.supabaseId}/rated-content`);
+          console.log('[ProfileSettings] Watch history response:', response);
           const data = response as UserRatedContentResponse;
-          setRatedContent(data.ratedItems || []); // Assume API returns an array of ratedItems
-          // *** End TODO ***
-
+          setRatedContent(data.ratedItems || []);
       } catch (error) {
-          console.error('Error loading watch history:', error);
+          console.error('[ProfileSettings] Error loading watch history:', error);
           toast({
               title: 'Error',
               description: 'Failed to load watch history. Please try again.',
               variant: 'destructive',
           });
-          setRatedContent([]); // Clear history on error
+          setRatedContent([]);
       } finally {
-          setIsLoading(false);
+          setIsHistoryLoading(false);
       }
   };
 
@@ -111,11 +123,13 @@ export default function ProfileSettings() {
 
   const handleSaveChanges = async () => {
     if (!user || !user.id) return;
-    setIsLoading(true);
+    setIsSaving(true);
     try {
-      await apiRequest('PUT', `/api/auth/user/${user.id}/preferences`, {
-        preferences: { streamingServices: selectedServices }
-      });
+      const payload = { preferences: { streamingServices: selectedServices } };
+      console.log("[ProfileSettings] Saving preferences with payload:", payload);
+
+      const response = await apiRequest('PUT', `/api/auth/user/${user.id}/preferences`, payload);
+      console.log("[ProfileSettings] Preferences save response:", response);
       toast({
         title: "Preferences Saved!",
         description: "Your streaming service preferences have been updated.",
@@ -128,7 +142,7 @@ export default function ProfileSettings() {
         variant: "destructive"
       });
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   };
 
@@ -194,6 +208,7 @@ export default function ProfileSettings() {
                           checked={selectedServices.includes(service.id)}
                           onCheckedChange={() => handleServiceToggle(service.id)}
                           className="border-gray-700 data-[state=checked]:bg-red-600 data-[state=checked]:text-white"
+                          disabled={isStreamingLoading || isSaving}
                         />
                         <Label htmlFor={`service-${service.id}`} className="text-gray-300 cursor-pointer flex items-center gap-2">
                            {service.logoUrl && (
@@ -204,12 +219,13 @@ export default function ProfileSettings() {
                       </div>
                     ))}
                   </div>
+                  {isStreamingLoading && <div className="text-center text-gray-400 mt-4">Loading services...</div>}
                   <Button
                     onClick={handleSaveChanges}
-                    disabled={isLoading}
+                    disabled={isSaving || isStreamingLoading}
                     className="mt-6 bg-red-600 hover:bg-red-700 font-semibold"
                   >
-                    {isLoading ? 'Saving...' : 'Save Changes'}
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </Button>
                 </CardContent>
               </Card>
@@ -224,7 +240,7 @@ export default function ProfileSettings() {
                   <CardTitle className="text-white">Rated Content</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {isLoading ? (
+                  {isHistoryLoading ? (
                     <div className="text-center text-gray-400">Loading history...</div>
                   ) : ratedContent.length === 0 ? (
                     <div className="text-center text-gray-400">No rated content found yet.</div>

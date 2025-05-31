@@ -1,4 +1,4 @@
-import { pgTable, foreignKey, unique, check, uuid, text, timestamp, integer, jsonb, pgPolicy, bigint, boolean, date, serial, primaryKey, pgSchema, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, foreignKey, unique, check, uuid, text, timestamp, integer, jsonb, pgPolicy, bigint, boolean, date, serial, primaryKey, pgSchema } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -178,10 +178,6 @@ export const content = pgTable("content", {
   posterPath: text("poster_path"),
   releaseDate: text("release_date"),
   genreIds: jsonb("genre_ids").$type<number[]>(),
-  imdbId: text("imdb_id"),
-  rottenTomatoesRating: integer("rotten_tomatoes_rating"),
-  streamingProviders: jsonb("streaming_providers").$type<any[]>(),
-  trailerUrl: text("trailer_url"),
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
   unique("content_tmdb_id_type_unique").on(table.tmdbId, table.type),
@@ -190,7 +186,7 @@ export const content = pgTable("content", {
 export const ratedContent = pgTable("rated_content", {
   userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   contentId: integer("content_id").notNull().references(() => content.id, { onDelete: "cascade" }),
-  rating: doublePrecision("rating").notNull(),
+  rating: integer("rating").notNull(), // Example: 1-5 stars, or -1/1 for like/dislike etc.
   ratedAt: timestamp("rated_at", { mode: 'string' }).defaultNow().notNull(),
 }, (t) => ({
   pk: primaryKey({ columns: [t.userId, t.contentId], name: "rated_content_pk"}),

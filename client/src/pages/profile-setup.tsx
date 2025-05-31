@@ -11,7 +11,7 @@ import { ThumbsUp, ThumbsDown, Loader2 } from 'lucide-react';
 import { useLocation } from 'wouter';
 
 export default function ProfileSetup() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [step, setStep] = useState(1);
@@ -220,6 +220,8 @@ export default function ProfileSetup() {
       });
 
       console.log('API Response:', response);
+
+      await refreshUser();
 
       toast({
         title: "Profile Complete!",

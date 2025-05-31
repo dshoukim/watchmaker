@@ -29,8 +29,13 @@ export function useWebSocket(roomCode: string | null, userId: number | null) {
     if (!roomCode || !userId) return;
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const host = window.location.host;
+    const wsPath = "/ws"; // Explicitly define the path
+    const wsUrl = `${protocol}//${host}${wsPath}`;
     
+    console.log('[WebSocket] Attempting to connect. Protocol:', protocol, 'Host:', host, 'Path:', wsPath, 'Constructed URL:', wsUrl);
+    // console.log('[WebSocket] window.location object:', window.location);
+
     ws.current = new WebSocket(wsUrl);
 
     ws.current.onopen = () => {

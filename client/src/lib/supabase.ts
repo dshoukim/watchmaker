@@ -11,22 +11,29 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 export async function signInWithGoogle() {
-  // Use current origin for redirect (works for both local and deployed)
-  const redirectUrl = window.location.origin;
-  
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: redirectUrl,
-    }
-  });
+  try {
+    console.log('[SUPABASE] Starting Google OAuth flow...');
+    
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google'
+      // Let Supabase handle the redirect automatically
+    });
 
-  if (error) {
-    console.error('Error signing in with Google:', error);
+    if (error) {
+      console.error('[SUPABASE] Error signing in with Google:', error);
+      console.error('[SUPABASE] Error details:', {
+        message: error.message,
+        status: error.status
+      });
+      throw error;
+    }
+
+    console.log('[SUPABASE] OAuth initiation successful:', data);
+    return data;
+  } catch (error) {
+    console.error('[SUPABASE] Caught exception during Google sign-in:', error);
     throw error;
   }
-
-  return data;
 }
 
 export async function signOut() {
