@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm/relations";
-import { watchPartyContent, watchPartySwipes, profiles, contentRatings, usersInAuth, users, rooms, roomParticipants, votes, userSessions, content, wishlist, ratedContent } from "./schema";
+import { watchPartyContent, watchPartySwipes, profiles, contentRatings, users, rooms, roomParticipants, votes, userSessions, content, wishlist, ratedContent } from "./schema";
+import { sql } from "drizzle-orm";
 
 export const watchPartySwipesRelations = relations(watchPartySwipes, ({one}) => ({
 	watchPartyContent: one(watchPartyContent, {
@@ -24,10 +25,6 @@ export const watchPartyContentRelations = relations(watchPartyContent, ({one, ma
 export const profilesRelations = relations(profiles, ({one, many}) => ({
 	watchPartySwipes: many(watchPartySwipes),
 	contentRatings: many(contentRatings),
-	usersInAuth: one(usersInAuth, {
-		fields: [profiles.id],
-		references: [usersInAuth.id]
-	}),
 	watchPartyContents: many(watchPartyContent),
 	wishlists: many(wishlist),
 	ratedContents: many(ratedContent),
@@ -42,10 +39,6 @@ export const contentRatingsRelations = relations(contentRatings, ({one}) => ({
 		fields: [contentRatings.userId],
 		references: [profiles.id]
 	}),
-}));
-
-export const usersInAuthRelations = relations(usersInAuth, ({many}) => ({
-	profiles: many(profiles),
 }));
 
 export const roomsRelations = relations(rooms, ({one, many}) => ({
@@ -124,3 +117,16 @@ export const ratedContentRelations = relations(ratedContent, ({one}) => ({
 		references: [profiles.id]
 	}),
 }));
+
+export async function up(db) {
+	// Drop the old foreign key constraint if it exists
+	await db.execute(sql`ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_id_fkey;`);
+	// Add the correct foreign key constraint
+	await db.execute(sql`ALTER TABLE profiles ADD CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id);`);
+}
+
+export async function down(db) {
+	// Remove the new foreign key constraint
+	await db.execute(sql`ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_id_fkey;`);
+	// Optionally, you could re-add the old constraint here if needed
+}
