@@ -213,6 +213,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/auth/user/:id', async (req, res) => {
+    try {
+      let profile = await storage.getProfileById(req.params.id);
+      if (!profile) {
+        // Fallback: create a minimal profile if not found
+        profile = await storage.createProfile({
+          id: req.params.id,
+          email: '', // Optionally, fetch from Supabase Auth if available
+        });
+      }
+      res.json(profile);
+    } catch (error) {
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+
   // TMDB Routes
   app.get('/api/tmdb/genres/:type', async (req, res) => {
     try {

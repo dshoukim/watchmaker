@@ -38,6 +38,9 @@ export interface IStorage {
   getUserSessions(userId: number): Promise<UserSession[]>;
 
   getAllStreamingServices(supabaseClient: SupabaseClient): Promise<StreamingService[]>;
+
+  getProfileById(id: string): Promise<any | undefined>;
+  createProfile(profile: any): Promise<any>;
 }
 
 export class SupabaseStorage implements IStorage {
@@ -413,6 +416,17 @@ export class SupabaseStorage implements IStorage {
         count: null 
       };
     }
+  }
+  async getProfileById(id: string) {
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', id).single();
+    if (error) return undefined;
+    return data;
+  }
+  async createProfile(profile: any) {
+    const { id, ...rest } = profile;
+    const { data, error } = await supabase.from('profiles').insert([{ id, ...rest }]).select().single();
+    if (error) throw error;
+    return data;
   }
 }
 
