@@ -169,17 +169,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/auth/user/:id', async (req, res) => {
     try {
+      console.log(`[AUTH ROUTE] Fetching profile for id: ${req.params.id}`);
       let profile = await storage.getProfileById(req.params.id);
+      console.log(`[AUTH ROUTE] getProfileById result:`, profile);
       if (!profile) {
-        // Fallback: create a minimal profile if not found
-        profile = await storage.createProfile({
-          id: req.params.id,
-          email: '', // Optionally, fetch from Supabase Auth if available
-        });
+        try {
+          console.log(`[AUTH ROUTE] Profile not found, creating new profile for id: ${req.params.id}`);
+          profile = await storage.createProfile({
+            id: req.params.id,
+            email: '', // Optionally, fetch from Supabase Auth if available
+          });
+          console.log(`[AUTH ROUTE] Created new profile:`, profile);
+        } catch (createErr) {
+          console.error(`[AUTH ROUTE] Error creating profile:`, createErr);
+          return res.status(500).json({ error: 'Failed to create profile', details: createErr instanceof Error ? createErr.message : createErr });
+        }
       }
       res.json(profile);
     } catch (error) {
-      res.status(500).json({ error: 'Server error' });
+      console.error(`[AUTH ROUTE] Unexpected error:`, error);
+      res.status(500).json({ error: 'Server error', details: error instanceof Error ? error.message : error });
     }
   });
 
