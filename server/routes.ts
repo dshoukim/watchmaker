@@ -62,22 +62,17 @@ function broadcastToRoom(roomCode: string, message: any) {
 const getSupabaseClient = (req: Request) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader?.split(' ')[1]; // Extract JWT
-  
-  // Assuming supabaseUrl is defined and accessible here
-  const supabaseUrl = 'https://qouppyvbepiccepacxne.supabase.co'; // Replace with your actual Supabase URL or process.env variable
-  
+  const supabaseUrl = process.env.SUPABASE_URL || 'https://qouppyvbepiccepacxne.supabase.co';
+
   if (token) {
-    // Create a client with the user's JWT
-    return createClient(supabaseUrl, token, { // Pass token as the second argument
-      auth: {
-        persistSession: false // Prevent saving session on the server
-      }
+    console.log('[getSupabaseClient] Using user JWT for Supabase client');
+    return createClient(supabaseUrl, token, {
+      auth: { persistSession: false }
     });
   }
-  
-  // Fallback to anon client if no token (adjust based on your RLS and needs)
-  // You might want to throw an error here if the endpoint strictly requires authentication
-  const supabaseKey = process.env.SUPABASE_ACCESS_TOKEN;
+  // Fallback to service role key
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  console.log('[getSupabaseClient] Using service role key for Supabase client:', !!supabaseKey);
   return createClient(supabaseUrl, supabaseKey);
 };
 
@@ -537,7 +532,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Authorization header:', req.headers['authorization']);
       // Get Supabase client with user's auth context
       const authenticatedSupabase = getSupabaseClient(req);
-
+      // Log the key used for this client
+      if (req.headers['authorization']) {
+        console.log('[streaming-services] Using user JWT for Supabase client');
+      } else {
+        console.log('[streaming-services] Using service role key for Supabase client:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+      }
       // Pass the authenticated client to the storage method
       console.log('Fetching streaming services with Supabase client...');
       const services = await storage.getAllStreamingServices(authenticatedSupabase);
