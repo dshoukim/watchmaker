@@ -167,13 +167,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/auth/user/:supabase_id', async (req, res) => {
+  app.get('/api/auth/user/:id', async (req, res) => {
     try {
-      const user = await storage.getUserBySupabaseId(req.params.supabase_id);
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
+      let profile = await storage.getProfileById(req.params.id);
+      if (!profile) {
+        // Fallback: create a minimal profile if not found
+        profile = await storage.createProfile({
+          id: req.params.id,
+          email: '', // Optionally, fetch from Supabase Auth if available
+        });
       }
-      res.json(user);
+      res.json(profile);
     } catch (error) {
       res.status(500).json({ error: 'Server error' });
     }
@@ -210,22 +214,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Failed to fetch user rated content:', error);
       res.status(500).json({ error: 'Server error fetching rated content' });
-    }
-  });
-
-  app.get('/api/auth/user/:id', async (req, res) => {
-    try {
-      let profile = await storage.getProfileById(req.params.id);
-      if (!profile) {
-        // Fallback: create a minimal profile if not found
-        profile = await storage.createProfile({
-          id: req.params.id,
-          email: '', // Optionally, fetch from Supabase Auth if available
-        });
-      }
-      res.json(profile);
-    } catch (error) {
-      res.status(500).json({ error: 'Server error' });
     }
   });
 
