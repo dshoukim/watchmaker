@@ -1,3 +1,27 @@
+// Profile Setup Page
+// ------------------
+// This component guides a new user through building their profile by selecting genres, streaming services, and rating movies/TV shows.
+// It saves user preferences to the backend and navigates to the dashboard when complete.
+//
+// Steps:
+// 1. Select genres
+// 2. Select streaming services
+// 3. Rate movies and TV shows
+//
+// API interactions:
+// - GET /api/streaming-services: Fetches available streaming services
+// - PUT /api/auth/user/:id/preferences: Saves user preferences
+//
+// State:
+// - step: Current step in the setup flow
+// - selectedGenres, selectedServices: User's selections
+// - recommendations: Movies/TV shows to rate
+// - preferences: Accumulated user preferences
+// - isLoading: Loading state for async actions
+//
+// Navigation:
+// - On completion, navigates to /dashboard
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
@@ -10,38 +34,64 @@ import { useToast } from '@/hooks/use-toast';
 import { ThumbsUp, ThumbsDown, Loader2 } from 'lucide-react';
 import { useLocation } from 'wouter';
 
+// TODO: Need to check here if the user already has a profile set up
+// TODO: Every time the user logs in after logging in, we should ask them to review the movie they selected/watched the last time they entered a room.
+// TODO: Every time the user rates a new movie, we need to update their profile
+// TODO:
+
+/**
+ * ProfileSetup component
+ * Guides the user through initial profile creation and preference selection.
+ */
 export default function ProfileSetup() {
+  // Auth context provides user info and refreshUser to reload user data
   const { user, refreshUser } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
+
+  // Step state: 1 = genres, 2 = streaming services, 3 = rating content
   const [step, setStep] = useState(1);
+  // User's selected genres (TMDB genre IDs as strings)
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  // All available genres (fetched from TMDB)
   const [genres, setGenres] = useState<TMDBGenre[]>([]);
+  // Recommendations to rate (movies or TV shows)
   const [recommendations, setRecommendations] = useState<TMDBMovie[]>([]);
+  // Index of the current movie/TV show being rated
   const [currentIndex, setCurrentIndex] = useState(0);
+  // User's accumulated preferences
   const [preferences, setPreferences] = useState({
     genres: [] as string[],
     favoriteMovies: [] as number[],
     favoriteTVShows: [] as number[],
     streamingServices: [] as number[],
   });
+  // Loading state for async actions
   const [isLoading, setIsLoading] = useState(false);
+  // Whether we're rating movies or TV shows
   const [contentType, setContentType] = useState<'movie' | 'tv'>('movie');
+  // All available streaming services (from backend)
   const [streamingServices, setStreamingServices] = useState<any[]>([]);
+  // User's selected streaming services (IDs)
   const [selectedServices, setSelectedServices] = useState<number[]>([]);
 
+  // On mount, load genres and streaming services
   useEffect(() => {
     loadGenres();
     loadStreamingServices();
   }, []);
 
-  // Load recommendations when step becomes 3
+  // When step becomes 3, load recommendations to rate
   useEffect(() => {
     if (step === 3) {
       loadRecommendations();
     }
   }, [step]);
 
+  /**
+   * Fetches and combines movie and TV genres from TMDB.
+   * Deduplicates by genre name.
+   */
   const loadGenres = async () => {
     try {
       const [movieGenres, tvGenres] = await Promise.all([
@@ -68,6 +118,9 @@ export default function ProfileSetup() {
     }
   };
 
+  /**
+   * Fetches available streaming services from the backend API.
+   */
   const loadStreamingServices = async () => {
     try {
       const res = await fetch('/api/streaming-services');
@@ -83,6 +136,9 @@ export default function ProfileSetup() {
     }
   };
 
+  /**
+   * Loads movie or TV recommendations for the user to rate, based on selected genres.
+   */
   const loadRecommendations = async () => {
     if (selectedGenres.length === 0) {
       toast({
@@ -115,6 +171,10 @@ export default function ProfileSetup() {
     }
   };
 
+  /**
+   * Handles toggling a genre selection.
+   * @param genreId TMDB genre ID as string
+   */
   const handleGenreToggle = (genreId: string) => {
     setSelectedGenres(prev => 
       prev.includes(genreId)
@@ -123,12 +183,21 @@ export default function ProfileSetup() {
     );
   };
 
+  /**
+   * Handles toggling a streaming service selection.
+   * @param id Streaming service ID
+   */
   const handleServiceToggle = (id: number) => {
     setSelectedServices(prev =>
       prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]
     );
   };
 
+  /**
+   * Handles rating a movie or TV show (like/dislike).
+   * Updates preferences and advances to the next item or step.
+   * @param liked Whether the user liked the item
+   */
   const handleRating = (liked: boolean) => {
     const currentMovie = recommendations[currentIndex];
     
@@ -160,6 +229,10 @@ export default function ProfileSetup() {
     }
   };
 
+  /**
+   * Loads TV show recommendations for the user to rate.
+   * Called after rating movies.
+   */
   const loadTVRecommendations = async () => {
     setIsLoading(true);
     try {
@@ -175,6 +248,10 @@ export default function ProfileSetup() {
     }
   };
 
+  /**
+   * Advances from genre selection to streaming services step.
+   * Validates that at least one genre is selected.
+   */
   const handleContinueFromGenres = () => {
     if (selectedGenres.length === 0) {
       toast({
@@ -187,6 +264,10 @@ export default function ProfileSetup() {
     setStep(2);
   };
 
+  /**
+   * Advances from streaming services to rating step.
+   * Validates that at least one service is selected.
+   */
   const handleContinueFromServices = () => {
     if (selectedServices.length === 0) {
       toast({
@@ -200,8 +281,16 @@ export default function ProfileSetup() {
     setStep(3); // Move to step 3
   };
 
+  /**
+   * Finalizes profile setup by saving preferences to the backend and navigating to dashboard.
+   * Calls PUT /api/auth/user/:id/preferences and refreshes user data.
+   */
   const finishSetup = async () => {
-    if (!user) return;
+    console.log('[ProfileSetup] Entered finishSetup');
+    if (!user) {
+      console.log('[ProfileSetup] No user found, aborting finishSetup');
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -211,27 +300,31 @@ export default function ProfileSetup() {
         streamingServices: selectedServices,
       };
 
-      console.log('Submitting profile preferences:', finalPreferences);
+      console.log('[ProfileSetup] Submitting profile preferences:', finalPreferences);
       const apiUrl = `/api/auth/user/${user.id}/preferences`;
-      console.log('API URL:', apiUrl);
+      console.log('[ProfileSetup] API URL:', apiUrl);
 
       const response = await apiRequest('PUT', apiUrl, {
         preferences: finalPreferences
       });
 
-      console.log('API Response:', response);
+      console.log('[ProfileSetup] API Response:', response);
 
+      console.log('[ProfileSetup] Calling refreshUser...');
       await refreshUser();
+      console.log('[ProfileSetup] refreshUser complete');
 
       toast({
         title: "Profile Complete!",
         description: "Your preferences have been saved. You can now create or join watch rooms.",
       });
+      console.log('[ProfileSetup] Toast shown, navigating to /dashboard');
 
       // Redirect to dashboard using navigate
       navigate('/dashboard');
+      console.log('[ProfileSetup] Navigation to /dashboard triggered');
     } catch (error) {
-      console.error('Error saving preferences:', error);
+      console.error('[ProfileSetup] Error saving preferences:', error);
       toast({
         title: "Error",
         description: "Failed to save preferences. Please try again.",
@@ -239,19 +332,25 @@ export default function ProfileSetup() {
       });
     } finally {
       setIsLoading(false);
+      console.log('[ProfileSetup] finishSetup complete, isLoading set to false');
     }
   };
 
+  // Current movie/TV show being rated
   const currentMovie = recommendations[currentIndex];
+  // Whether we're on the movie or TV step
   const isMovieStep = contentType === 'movie';
+  // Total steps for progress bar
   const totalSteps = recommendations.length * 2; // Movies + TV shows
+  // Current step for progress bar
   const currentStep = isMovieStep ? currentIndex + 1 : recommendations.length + currentIndex + 1;
-
+  // Progress bar value
   const progress = step === 1 ? 0 :
                    step === 2 ? 33 :
                    step === 3 ? 66 + (recommendations.length > 0 ? ((currentIndex + 1) / recommendations.length) * 34 : 0) :
                    100;
 
+  // Render genre selection step
   if (step === 1) {
     return (
       <div className="min-h-screen px-6 py-8 bg-black">
@@ -308,6 +407,7 @@ export default function ProfileSetup() {
     );
   }
 
+  // Render streaming services selection step
   if (step === 2) {
     return (
       <div className="min-h-screen px-6 py-8 bg-black">
@@ -367,6 +467,7 @@ export default function ProfileSetup() {
     );
   }
 
+  // Render rating step (movies or TV shows)
   if (step === 3 && currentMovie) {
     return (
       <div className="min-h-screen px-6 py-8 bg-black">
@@ -433,6 +534,7 @@ export default function ProfileSetup() {
     );
   }
 
+  // Render loading/fallback state
   return (
     <div className="min-h-screen flex items-center justify-center bg-black">
       <div className="text-center">
